@@ -1,0 +1,5 @@
+{
+  "name": "Copy of Limpa Marca Prime",
+  "description": "A modern, chat-based web application that allows users to generate new images from text prompts or edit existing images by providing an image and a text description of the desired changes. Powered by Google's Gemini and Imagen models.",
+  "requestFramePermissions": []
+}
