@@ -8,10 +8,31 @@ export interface ImageResult {
   text?: string;
 }
 
+const scaleImage = (dataUrl: string, scale: number): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Failed to get canvas context'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = dataUrl;
+  });
+};
+
 export const generateOrEditImage = async (
   prompt: string,
   imageFile?: File,
-  aspectRatio?: string
+  aspectRatio?: string,
+  scale: number = 1
 ): Promise<ImageResult[]> => {
   if (imageFile) {
     // --- Image Editing Logic ---
@@ -36,7 +57,11 @@ export const generateOrEditImage = async (
     if (response.candidates && response.candidates[0].content.parts) {
       for (const part of response.candidates[0].content.parts) {
         if (part.inlineData) {
-          const url = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+          let url = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+          // Apply scale if not 1
+          if (scale !== 1) {
+            url = await scaleImage(url, scale);
+          }
           results.push({ url });
         } else if (part.text) {
            if (results.length > 0) {
@@ -66,8 +91,18 @@ export const generateOrEditImage = async (
         throw new Error("Image generation failed. The prompt may have been blocked or the content policy was triggered.");
     }
 
-    return response.generatedImages.map(img => ({
-        url: `data:image/png;base64,${img.image.imageBytes}`,
-    }));
+    const results = await Promise.all(
+      response.generatedImages.map(async (img) => {
+        let url = `data:image/png;base64,${img.image.imageBytes}`;
+        // Apply scale if not 1
+        if (scale !== 1) {
+          url = await scaleImage(url, scale);
+        }
+        return { url };
+      })
+    );
+
+    return results;
   }
 };
+
